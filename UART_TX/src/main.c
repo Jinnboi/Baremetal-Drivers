@@ -24,7 +24,7 @@ int main(void)
 void my_put(char *text) {
     int idx = 0;
     while(*(text + idx)) {
-	uart2_write(*(text + idx++));
+	    uart2_write(*(text + idx++));
     }
 
     return;
