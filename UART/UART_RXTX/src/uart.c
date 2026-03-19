@@ -7,7 +7,7 @@
  * @date    2026-03-19
  **/
 
-#include "uart.h"
+#include "../include/uart.h"
 
 #define GPIOAEN				(1U<<0)
 #define UART2EN				(1U<<17)

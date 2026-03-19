@@ -7,7 +7,7 @@
  * @date    2026-03-19
  **/
 
-#include "uart.h"
+#include "../include/uart.h"
 
 #define LED_PIN				(1U<<5)
 
