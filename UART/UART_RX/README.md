@@ -10,4 +10,4 @@ This driver implements a bare-metal UART Receiver. It demonstrates basic data ac
 ### Hardware Setup
 * RX Pin: PA3 (D0)
 * LED Pin: PA5 (D13)
-* Baudrate: 9600
+* Baudrate: 115200
