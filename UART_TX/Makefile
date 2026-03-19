@@ -1,4 +1,4 @@
-TARGET = uart_test
+TARGET = uart_tx_test
 
 CC      = arm-none-eabi-gcc
 AS      = arm-none-eabi-gcc
