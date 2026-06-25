@@ -4,9 +4,9 @@
  * 				on-board LED and User Button
  * @author 		Marcos E. Mancia Jr.
  * @date 		2026-06-25
- * @version 	1.0
+ * @version 	1.1
  */
-#include "stm32f411xe.h"
+#include "gpio.h"
 
 /***** USEFUL MACROS *****/
 #define GPIOAEN				(1U<<0)
@@ -18,15 +18,6 @@
 void gpio_output_test(void);
 void gpio_bsrr_test(void);
 void gpio_input_test(void);
-
-int main(void) {
-	/***** Uncomment desired test function *****/
-	gpio_output_test();
-	//gpio_bsrr_test();
-	//gpio_input_test();
-
-	while(1) {}
-}
 
 /*
  * @brief		Toggles the on-board LED using the ODR register
