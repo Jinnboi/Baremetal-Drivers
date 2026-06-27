@@ -1,10 +1,10 @@
-/*
+/**
  * @file 		gpio.c
  * @brief 		Tests GPIO peripheral modes (Output, BSRR, and Input) via
  * 				on-board LED and User Button
  * @author 		Marcos E. Mancia Jr.
- * @date 		2026-06-25
- * @version 	1.1
+ * @date 		2026-06-26
+ * @version 	1.3
  */
 #include "gpio.h"
 #include "stm32f411xe.h"
@@ -22,7 +22,7 @@ void gpio_input_test(void);
 
 /***** TEST FUNCTIONS *****/
 
-/*
+/**
  * @brief		Toggles the on-board LED using the ODR register
  */
 void gpio_output_test(void) {
@@ -40,7 +40,7 @@ void gpio_output_test(void) {
 	}
 }
 
-/*
+/**
  * @brief		Toggles the on-board LED using atomic writes via the BSRR register
  */
 void gpio_bsrr_test(void) {
@@ -62,7 +62,7 @@ void gpio_bsrr_test(void) {
 	}
 }
 
-/*
+/**
  * @brief		Polls the User Button state and drives the LED
  */
 void gpio_input_test(void) {
@@ -79,7 +79,7 @@ void gpio_input_test(void) {
 
 	while(1) {
 		/*Check if BTN is pressed*/
-		if(GPIOC->IDR & BTN_PIN) {
+		if(!(GPIOC->IDR & BTN_PIN)) {
 			/*Set corresponding ODR bit of PA5*/
 			GPIOA->BSRR |= LED_PIN;
 		}else {
