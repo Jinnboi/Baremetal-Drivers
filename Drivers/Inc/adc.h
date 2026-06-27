@@ -12,6 +12,9 @@
 
 void adc_init(void);
 uint32_t adc_read(void);
-void start_conversion(void);
+void start_conversion(uint8_t cont);
+
+void adc_single_test(void);
+void adc_continuous_test(void);
 
 #endif /* ADC_H_ */
