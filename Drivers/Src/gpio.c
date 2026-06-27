@@ -7,6 +7,7 @@
  * @version 	1.1
  */
 #include "gpio.h"
+#include "stm32f411xe.h"
 
 /***** USEFUL MACROS *****/
 #define GPIOAEN				(1U<<0)
@@ -18,6 +19,8 @@
 void gpio_output_test(void);
 void gpio_bsrr_test(void);
 void gpio_input_test(void);
+
+/***** TEST FUNCTIONS *****/
 
 /*
  * @brief		Toggles the on-board LED using the ODR register

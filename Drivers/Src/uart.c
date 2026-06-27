@@ -5,7 +5,9 @@
  * @date        2026-06-25
  * @version     1.0
  */
+#include <stdint.h>
 #include "uart.h"
+#include "stm32f411xe.h"
 
 /***** USEFUL MACROS *****/
 #define GPIOAEN				(1U<<0)
@@ -37,7 +39,8 @@ void uart2_tx_test(void) {
     uart2_tx_init();
 	
     while(1) {
-		printf("Is this working???\n\r");
+		my_put("Is this working???\n\r");
+		for(volatile int i=0;i<1000000;i++) {}
 	}
 }
 
@@ -231,7 +234,13 @@ static uint16_t compute_uart_bd(uint32_t PeriphClk, uint32_t Baudrate) {
 	return (uint16_t)(PeriphClk + (Baudrate/2U))/Baudrate;
 }
 
-int __io_putchar(int ch) {
-	uart2_write(ch);
-	return ch;
+/**
+ * @brief  		Transmits a null-terminated string over UART character-by-character
+ * @param  		text: Pointer to the constant character string to be transmitted
+ */
+void my_put(const char *text) {
+	int idx = 0;
+	while(*text) {
+		uart2_write(*text++);
+	}
 }
