@@ -11,6 +11,6 @@
 
 void systickDelayMs(int delay);
 
-void systick_test(void)
+void systick_test(void);
 
 #endif /* SYSTICK_H_ */
