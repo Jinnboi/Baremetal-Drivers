@@ -2,28 +2,33 @@
  * @file        adc.c
  * @brief       Tests ADC peripheral modes (Single, Continuous)
  * @author      Marcos E. Mancia Jr.
- * @date        2026-06-26
- * @version     1.0
+ * @date        2026-06-30
+ * @version     1.2
  */
+#include "stm32f411xe.h"
 #include "adc.h"
 #include "uart.h"
-#include "stm32f411xe.h"
 
 /***** USEFUL MACROS *****/
-#define GPIOAEN				(1U<<0)
-#define ADC1EN				(1U<<8)
+#define GPIOAEN					(1U<<0)
+#define ADC1EN					(1U<<8)
 
-#define ADC_CH1				(1U<<0)
-#define ADC_SEQ_LEN_1		(0x00)
+#define ADC_CH1					(1U<<0)
+#define ADC_SEQ_LEN_1			(0x00)
 
-#define CR2_ADON			(1U<<0)
-#define CR2_SWSTART			(1U<<30)
-#define CR2_CONT			(1U<<1)
+#define CR2_ADON				(1U<<0)
+#define CR2_SWSTART				(1U<<30)
+#define CR2_CONT				(1U<<1)
 
-#define SR_EOC				(1U<<1)
+#define SR_EOC					(1U<<1)
 
-#define SINGLE_CONVERSION 	(0U)
-#define CONT_CONVERSION		(1U)
+#define SINGLE_CONVERSION		(0U)
+#define CONT_CONVERSION			(1U)
+
+/***** FUNCTION PROTOTYPES *****/
+void start_conversion(uint8_t cont);
+uint32_t adc_read(void);
+void print_num(uint32_t num);
 
 /***** TEST FUNCTIONS *****/
 
@@ -31,17 +36,21 @@
  * @brief  		Demonstrates ADC in Single Conversion Mode
  */
 void adc_single_test(void) {
+	/*Initialize necessary peripherals for test*/
 	uart2_tx_init();
 	adc_init();
 
 	uint32_t sensor_val;
 	while(1) {
+		/*Start the conversion process for a single sensor value*/
 		start_conversion(SINGLE_CONVERSION);
 		sensor_val = adc_read();
+
+		/*Print out the sensor value to the terminal via UART*/
 		my_put("Sensor value (Single):");
 		print_num(sensor_val);
 		my_put("\n\r");
-		for(volatile int i = 0; i < 100000; i++);
+		for(volatile int i=0;i<100000;i++);
 	}
 }
 
@@ -49,16 +58,22 @@ void adc_single_test(void) {
  * @brief  		Demonstrates ADC in Continuous Conversion Mode
  */
 void adc_continuous_test(void) {
+	/*Initialize necessary peripherals for test*/
 	uart2_tx_init();
 	adc_init();
+
+	/*Set the ADC to continuous conversion mode*/
+	/*This mode removes the need to start a conversion manually*/
 	start_conversion(CONT_CONVERSION);
 
 	uint32_t sensor_val;
 	while(1) {
+		/*Read the sensor value and print it to the terminal via UART*/
 		sensor_val = adc_read();
 		my_put("Sensor value (Continuous):");
 		print_num(sensor_val);
 		my_put("\n\r");
+		for(volatile int i=0;i<100000;i++);
 	}
 }
 
@@ -114,18 +129,7 @@ uint32_t adc_read(void) {
 	while(!(ADC1->SR & SR_EOC)) {}
 
 	/*Read converted result*/
-	return ADC1->DR;
-}
-
-/**
- * @brief  		Transmits a null-terminated string over UART character-by-character
- * @param  		text: Pointer to the constant character string to be transmitted
- */
-void my_put(const char *text) {
-	int idx = 0;
-	while(*text) {
-		uart2_write(*text++);
-	}
+	return (uint32_t)(ADC1->DR);
 }
 
 /**
@@ -137,12 +141,10 @@ void print_num(uint32_t num) {
 	int i = 10;
 
 	buf[i] = '\0';
-    if (num == 0) {
+    if(num == 0) {
         buf[--i] = '0';
-    }
-    else
-    {
-        while (num > 0) {
+    }else {
+        while(num > 0) {
         	// Implicitly cast uint32_t to char and floor divide
         	buf[--i] = '0' + (num % 10);
 	        num /= 10;
