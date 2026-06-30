@@ -2,12 +2,12 @@
  * @file        uart.c
  * @brief       Tests USART2 peripheral modes (RX, TX, RXTX) via serial terminal
  * @author      Marcos E. Mancia Jr.
- * @date        2026-06-25
- * @version     1.0
+ * @date        2026-06-30
+ * @version     1.3
  */
 #include <stdint.h>
-#include "uart.h"
 #include "stm32f411xe.h"
+#include "uart.h"
 
 /***** USEFUL MACROS *****/
 #define GPIOAEN				(1U<<0)
@@ -29,6 +29,9 @@
 static void uart_set_baudrate(USART_TypeDef *USARTx, uint32_t PeriphClk, uint32_t Baudrate);
 static uint16_t compute_uart_bd(uint32_t PeriphClk, uint32_t Baudrate);
 
+char uart2_read(void);
+void uart2_write(int ch);
+
 /***** TEST FUNCTIONS *****/
 
 /**
@@ -37,9 +40,10 @@ static uint16_t compute_uart_bd(uint32_t PeriphClk, uint32_t Baudrate);
 void uart2_tx_test(void) {
     /*Initialize USART2 in TX mode*/
     uart2_tx_init();
-	
+
+    /*Print messages to terminal*/
     while(1) {
-		my_put("Is this working???\n\r");
+    	my_put("Hello there!\r\n");
 		for(volatile int i=0;i<1000000;i++) {}
 	}
 }
@@ -59,6 +63,8 @@ void uart2_rx_test(void) {
     char key;
 	while(1) {
 		key = uart2_read();
+
+		/*If correct key is found, turn the LED on. Else, turn it off*/
 		if(key == '1') {
 			GPIOA->ODR |= LED_PIN;
 		}else {
@@ -83,6 +89,8 @@ void uart2_rxtx_test(void) {
 	while(1) {
 		key = uart2_read();
 
+		/*If correct key is found, turn the LED on. Else, turn it off*/
+		/*Additionally, print every character to the terminal*/
 		if(key == '@') {
 			GPIOA->ODR |= LED_PIN;
 			uart2_write(key);
@@ -219,7 +227,8 @@ void uart2_write(int ch) {
  * @param       PeriphClk: Frequency of the peripheral clock source feeding the module
  * @param       Baudrate: Desired communication speed (ex: 115200)
  */
-static void uart_set_baudrate(USART_TypeDef *USARTx, uint32_t PeriphClk, uint32_t Baudrate) {
+static void uart_set_baudrate(USART_TypeDef *USARTx, uint32_t PeriphClk,
+								uint32_t Baudrate) {
 	// Baudrate Register
 	USARTx->BRR = compute_uart_bd(PeriphClk, Baudrate);
 }
@@ -231,16 +240,16 @@ static void uart_set_baudrate(USART_TypeDef *USARTx, uint32_t PeriphClk, uint32_
  * @return      16-bit value corresponding to desired baudrate
  */
 static uint16_t compute_uart_bd(uint32_t PeriphClk, uint32_t Baudrate) {
-	return (uint16_t)(PeriphClk + (Baudrate/2U))/Baudrate;
+	return (uint16_t)((PeriphClk + (Baudrate/2U))/Baudrate);
 }
 
 /**
  * @brief  		Transmits a null-terminated string over UART character-by-character
- * @param  		text: Pointer to the constant character string to be transmitted
+ * @param  		text: Pointer to the const char string to be transmitted
  */
 void my_put(const char *text) {
 	int idx = 0;
-	while(*text) {
-		uart2_write(*text++);
+	while(text[idx]) {
+		uart2_write((int)(text[idx++]));
 	}
 }
