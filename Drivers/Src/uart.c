@@ -1,9 +1,9 @@
 /**
  * @file        uart.c
- * @brief       Tests USART2 peripheral modes (RX, TX, RXTX) via serial terminal
+ * @brief       Tests USART2 peripheral modes (RX, TX, RXTX, RXIE) via serial terminal
  * @author      Marcos E. Mancia Jr.
- * @date        2026-06-30
- * @version     1.3
+ * @date        2026-07-01
+ * @version     1.4
  */
 #include <stdint.h>
 #include "stm32f411xe.h"
@@ -17,6 +17,7 @@
 #define CR1_RE				(1U<<2)
 #define CR1_TE				(1U<<3)
 #define CR1_UE				(1U<<13)
+#define CR1_RXNEIE			(1U<<5)
 
 #define SR_RXNE				(1U<<5)
 #define SR_TXE				(1U<<7)
@@ -99,6 +100,20 @@ void uart2_rxtx_test(void) {
 			uart2_write(key);
 		}
 	}
+}
+
+void uart2_rx_interrupt_test(void) {
+	/*Enable CLK access to GPIOA*/
+	RCC->AHB1ENR |= GPIOAEN;
+
+	/*Enable General Purpose Output Mode for PA5*/
+	GPIOA->MODER |=  (1U<<10);
+	GPIOA->MODER &= ~(1U<<11);
+
+	/*Initialize necessary peripherals for test*/
+	uart2_rx_interrupt_init();
+
+	while(1) {}
 }
 
 /***** HELPER FUNCTIONS *****/
@@ -198,6 +213,40 @@ void uart2_rxtx_init(void) {
 }
 
 /**
+ * @brief       Initializes UART2 in RX mode with RXNE interrupts enabled
+ */
+void uart2_rx_interrupt_init(void) {
+	/*Enable CLK access to GPIOA*/
+	RCC->AHB1ENR |= GPIOAEN;
+
+	/*Set PA3 mode to alternate function mode*/
+	GPIOA->MODER |=  (1U<<7);
+	GPIOA->MODER &= ~(1U<<6);
+
+	/*Set PA3 alternate function type to UART_RX (AF07)*/
+	GPIOA->AFR[0] &= ~(1U<<15);
+	GPIOA->AFR[0] |=  (7U<<12);
+
+	/*Enable CLK access to UART2*/
+	RCC->APB1ENR |= UART2EN;
+
+	/*Configure baudrate*/
+	uart_set_baudrate(USART2, APB1_CLK, UART_BAUDRATE);
+
+	/*Configure transfer direction*/
+	USART2->CR1 = CR1_RE;
+
+	/*Enable RXNE interrupt*/
+	USART2->CR1 |= CR1_RXNEIE;
+
+	/*Enable USART2 interrupt in NVIC*/
+	NVIC_EnableIRQ(USART2_IRQn);
+
+	/*Enable UART2 module*/
+	USART2->CR1 |= CR1_UE;
+}
+
+/**
  * @brief       Blocks until a character is received, then reads it from the DR register
  * @return      Received character byte
  */
@@ -219,6 +268,29 @@ void uart2_write(int ch) {
 
 	/*Write to transmit data register*/
 	USART2->DR = (ch & 0xFF);
+}
+
+/**
+ * @brief       Callback function executed when a character is received over UART2
+ */
+static void uart_callback(void) {
+	/*Toggle LED if the input character matches the key*/
+	char key = USART2->DR;
+	if(key == 'M') {
+		GPIOA->ODR |= LED_PIN;
+	}else {
+		GPIOA->ODR &= ~LED_PIN;
+	}
+}
+
+/**
+ * @brief       ISR for USART2 global interrupts
+ */
+void USART2_IRQHandler(void) {
+	/*Check if RXNE is set*/
+	if(USART2->SR & SR_RXNE) {
+		uart_callback();
+	}
 }
 
 /**
