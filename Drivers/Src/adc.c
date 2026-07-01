@@ -2,28 +2,29 @@
  * @file        adc.c
  * @brief       Tests ADC peripheral modes (Single, Continuous)
  * @author      Marcos E. Mancia Jr.
- * @date        2026-06-30
- * @version     1.2
+ * @date        2026-07-01
+ * @version     1.3
  */
 #include "stm32f411xe.h"
 #include "adc.h"
 #include "uart.h"
 
 /***** USEFUL MACROS *****/
-#define GPIOAEN					(1U<<0)
-#define ADC1EN					(1U<<8)
+#define GPIOAEN				(1U<<0)
+#define ADC1EN				(1U<<8)
 
-#define ADC_CH1					(1U<<0)
-#define ADC_SEQ_LEN_1			(0x00)
+#define ADC_CH1				(1U<<0)
+#define ADC_SEQ_LEN_1		(0x00)
 
-#define CR2_ADON				(1U<<0)
-#define CR2_SWSTART				(1U<<30)
-#define CR2_CONT				(1U<<1)
+#define CR1_EOCIE			(1U<<5)
+#define CR2_ADON			(1U<<0)
+#define CR2_SWSTART			(1U<<30)
+#define CR2_CONT			(1U<<1)
 
-#define SR_EOC					(1U<<1)
+#define SR_EOC				(1U<<1)
 
-#define SINGLE_CONVERSION		(0U)
-#define CONT_CONVERSION			(1U)
+#define SINGLE_CONVERSION 	(0U)
+#define CONT_CONVERSION		(1U)
 
 /***** FUNCTION PROTOTYPES *****/
 void start_conversion(uint8_t cont);
@@ -50,7 +51,7 @@ void adc_single_test(void) {
 		my_put("Sensor value (Single):");
 		print_num(sensor_val);
 		my_put("\n\r");
-		for(volatile int i=0;i<100000;i++);
+		for(volatile int i = 0; i < 100000; i++);
 	}
 }
 
@@ -73,8 +74,17 @@ void adc_continuous_test(void) {
 		my_put("Sensor value (Continuous):");
 		print_num(sensor_val);
 		my_put("\n\r");
-		for(volatile int i=0;i<100000;i++);
 	}
+}
+
+void adc_interrupt_test(void) {
+	/*Initialize necessary peripherals for test*/
+	uart2_tx_init();
+	adc_interrupt_init();
+	start_conversion(CONT_CONVERSION);
+
+	/*Sensor values are now read when an interrupt occurs*/
+	while(1) {}
 }
 
 /***** HELPER FUNCTIONS *****/
@@ -101,6 +111,60 @@ void adc_init(void) {
 
 	/*Enable ADC module*/
 	ADC1->CR2 |= CR2_ADON;
+}
+
+/**
+ * @brief		Initializes ADC1 peripheral with interrupt functionality
+ */
+void adc_interrupt_init(void) {
+	/*Enable CLK access to GPIOA*/
+	RCC->AHB1ENR |= GPIOAEN;
+
+	/*Set the mode of PA1 to analog*/
+	GPIOA->MODER |= (3U<<2);
+
+	/*Enable CLK access to ADC*/
+	RCC->APB2ENR |= ADC1EN;
+
+	/*Enable ADC end-of-conversion interrupt*/
+	ADC1->CR1 |= CR1_EOCIE;
+
+	/*Enable ADC interrupt in NVIC*/
+	NVIC_EnableIRQ(ADC_IRQn);
+
+	/*Conversion sequence start*/
+	// 1 Channel, Channel 1 of ADC
+	ADC1->SQR3 = ADC_CH1;
+
+	/*Conversion sequence length*/
+	ADC1->SQR1 = ADC_SEQ_LEN_1;
+
+	/*Enable ADC module*/
+	ADC1->CR2 |= CR2_ADON;
+}
+
+/**
+ * @brief		Reads sensor value from PA1 and prints to serial terminal
+ */
+static void adc_callback(void) {
+	uint32_t sensor_val = ADC1->DR;
+	my_put("Sensor value: ");
+	print_num(sensor_val);
+	my_put("\n\r");
+	for(volatile int i=0;i<100000;i++) {}
+}
+
+/**
+ * @brief       ISR for ADC1 global interrupts
+ */
+void ADC_IRQHandler(void) {
+	/*Check for EOC in SR*/
+	if(ADC1->SR & SR_EOC) {
+		/*Clear EOC*/
+		ADC1->SR &= ~SR_EOC;
+
+		adc_callback();
+	}
 }
 
 /**
