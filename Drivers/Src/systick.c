@@ -2,14 +2,16 @@
  * @file        systick.c
  * @brief       Tests SysTick-based blocking delay for STM32F411xe
  * @author      Marcos E. Mancia Jr.
- * @date        2026-06-26
- * @version     1.0
+ * @date        2026-06-30
+ * @version     1.1
  */
 #include "stm32f411xe.h"
+#include "systick.h"
+#include "uart.h"
 
 /***** USEFUL MACROS *****/
-#define GPIOAEN			(1U<<0)
-#define LED_PIN         (1U<<5)
+#define GPIOAEN					(1U<<0)
+#define LED_PIN         		(1U<<5)
 
 #define SYSTICK_LOAD_VAL		16000
 #define CTRL_ENABLE				(1U<<0)
@@ -18,6 +20,10 @@
 
 /***** TEST FUNCTIONS *****/
 
+/**
+ * @brief  		Tests the SysTick timer by toggling an LED and
+ * 		   		printing a message every second
+ */
 void systick_test(void) {
     /*Enable UART peripheral (which also enables CLK access to GPIOA)*/
     uart2_tx_init();
@@ -29,6 +35,8 @@ void systick_test(void) {
 	while(1) {
 		my_put("A second has passed... \n\r");
 		GPIOA->ODR ^= LED_PIN;
+
+		/*Use SysTick peripheral to wait a second*/
 		systickDelayMs(1000);
 	}
 }
@@ -51,20 +59,9 @@ void systickDelayMs(int delay) {
 
 	for(int i=0;i<delay;i++) {
 		/*Wait until the COUNTFLAG is set*/
-		while((SysTick->CTRL & CTRL_COUNTFLAG) == 0) {}
+		while((SysTick->CTRL & CTRL_COUNTFLAG)==0) {}
 	}
 
     /*Disable SysTick peripheral after delay*/
 	SysTick->CTRL = 0;
-}
-
-/**
- * @brief  		Transmits a null-terminated string over UART character-by-character
- * @param  		text: Pointer to the constant character string to be transmitted
- */
-void my_put(const char *text) {
-	int idx = 0;
-	while(*text) {
-		uart2_write(*text++);
-	}
 }
