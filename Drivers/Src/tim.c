@@ -2,30 +2,31 @@
  * @file        tim.c
  * @brief       Tests Timer peripheral via serial terminal
  * @author      Marcos E. Mancia Jr.
- * @date        2026-06-30
- * @version     1.0
+ * @date        2026-07-01
+ * @version     1.1
  */
 #include "stm32f411xe.h"
 #include "tim.h"
 #include "uart.h"
 
 /***** USEFUL MACROS *****/
-#define GPIOAEN				(1U<<0)
-#define LED_PIN				(1U<<5)
+#define GPIOAEN			(1U<<0)
+#define LED_PIN			(1U<<5)
 
-#define AFR5_TIM			(1U<<20)
-#define AFR6_TIM			(1U<<25)
+#define AFR5_TIM		(1U<<20)
+#define AFR6_TIM		(1U<<25)
 
-#define TIM2EN				(1U<<0)
-#define TIM3EN				(1U<<1)
+#define TIM2EN			(1U<<0)
+#define TIM3EN			(1U<<1)
 
-#define CR1_CEN				(1U<<0)
-#define OC_TOGGLE			(1U<<4) | (1U<<5)
-#define CCER_CC1E			(1U<<0)
-#define CCER_CC1S			(1U<<0)
+#define CR1_CEN			(1U<<0)
+#define OC_TOGGLE		(1U<<4) | (1U<<5)
+#define CCER_CC1E		(1U<<0)
+#define CCER_CC1S		(1U<<0)
 
-#define SR_UIF		(1U<<0)
-#define SR_CC1IF 	(1U<<1)
+#define SR_UIF			(1U<<0)
+#define SR_CC1IF 		(1U<<1)
+#define DIER_UIE		(1U<<0)
 
 /***** TEST FUNCTIONS *****/
 
@@ -80,6 +81,28 @@ void timer_input_compare_test(void) {
 		timestamp = TIM3->CCR1;
 	}
 }
+
+/**
+ * @brief		Tests Timer peripheral's interrupt mode by printing message
+ * 				to the terminal and toggling LED every second
+ */
+void timer_interrupt_test(void) {
+	/*Enable CLK access to GPIOA*/
+	RCC->AHB1ENR |= GPIOAEN;
+
+	/*Enable General Purpose Output Mode for PA5*/
+	GPIOA->MODER |= (1U<<10);
+	GPIOA->MODER &= ~(1U<<11);
+
+	/*Enable necessary peripherals for test*/
+	uart2_tx_init();
+	tim2_interrupt_init();
+
+	/*Interrupt programming removes polling-based code in loop*/
+	while(1) {}
+}
+
+/***** HELPER FUNCTIONS *****/
 
 /**
  * @brief       Initializes TIM2 in basic timer mode to tick at a 1 Hz rate
@@ -162,4 +185,47 @@ void tim3_input_capture(void) {
 
 	/*Enable TIM3*/
 	TIM3->CR1 = CR1_CEN;
+}
+
+/**
+ * @brief		Initializes TIM2 to create an interrupt event every second
+ * 				(1 Hz)
+ */
+void tim2_interrupt_init(void) {
+	/*Enable CLK access to TIM2*/
+	RCC->APB1ENR |= TIM2EN;
+
+	/*Set the prescaler value*/
+	TIM2->PSC = 1600 - 1;	// 16 000 000 / 1600 = 10 000
+	/*Set auto-reload value*/
+	TIM2->ARR = 10000 - 1;	// 10 000 / 10 000 = 1 hz
+	/*Clear counter*/
+	TIM2->CNT = 0;
+
+	/*Enable timer*/
+	TIM2->CR1 = CR1_CEN;
+
+	/*Enable TIM interrupt*/
+	TIM2->DIER |= DIER_UIE;
+
+	/*Enable TIM interrupt in NVIC*/
+	NVIC_EnableIRQ(TIM2_IRQn);
+}
+
+/**
+ * @brief		Prints a string to the terminal and toggles LED
+ */
+static void tim_callback(void) {
+	my_put("A second has passed...\n\r");
+	GPIOA->ODR ^= LED_PIN;
+}
+
+/**
+ * @brief		ISR for TIM2 global interrupts
+ */
+void TIM2_IRQHandler(void) {
+	/*Clear UIF - update interrupt flag*/
+	TIM2->SR &= ~SR_UIF;
+
+	tim_callback();
 }
