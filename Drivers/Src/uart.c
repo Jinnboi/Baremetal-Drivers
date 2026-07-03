@@ -2,29 +2,40 @@
  * @file        uart.c
  * @brief       Tests USART2 peripheral modes (RX, TX, RXTX, RXIE) via serial terminal
  * @author      Marcos E. Mancia Jr.
- * @date        2026-07-01
- * @version     1.4
+ * @date        2026-07-02
+ * @version     1.5
  */
 #include <stdint.h>
 #include "stm32f411xe.h"
 #include "uart.h"
 
 /***** USEFUL MACROS *****/
-#define GPIOAEN				(1U<<0)
-#define UART2EN				(1U<<17)
-#define LED_PIN             (1U<<5)
+#define GPIOAEN						(1U<<0)
+#define UART2EN						(1U<<17)
+#define LED_PIN             		(1U<<5)
 
-#define CR1_RE				(1U<<2)
-#define CR1_TE				(1U<<3)
-#define CR1_UE				(1U<<13)
-#define CR1_RXNEIE			(1U<<5)
+#define CR1_RE						(1U<<2)
+#define CR1_TE						(1U<<3)
+#define CR1_UE						(1U<<13)
+#define CR1_RXNEIE					(1U<<5)
 
-#define SR_RXNE				(1U<<5)
-#define SR_TXE				(1U<<7)
+#define SR_RXNE						(1U<<5)
+#define SR_TXE						(1U<<7)
 
-#define SYS_FREQ			16000000
-#define APB1_CLK			SYS_FREQ
-#define UART_BAUDRATE		115200
+#define DMA1EN						(1U<<21)
+#define DMA_CR_EN					(1U<<0)
+#define CHSEL4						(1U<<27)
+#define DMA_MEM_INC					(1U<<10)
+#define DMA_DIR_MEM_TO_PERIPH		(1U<<6)
+#define DMA_CR_TCIE					(1U<<4)
+#define UART_CR3_DMAT				(1U<<7)
+
+#define HISR_TCIF6					(1U<<21)
+#define HIFCR_CTCIF6				(1U<<21)
+
+#define SYS_FREQ					16000000
+#define APB1_CLK					SYS_FREQ
+#define UART_BAUDRATE				115200
 
 /***** FUNCTION PROTOTYPES *****/
 static void uart_set_baudrate(USART_TypeDef *USARTx, uint32_t PeriphClk, uint32_t Baudrate);
@@ -112,6 +123,25 @@ void uart2_rx_interrupt_test(void) {
 
 	/*Initialize necessary peripherals for test*/
 	uart2_rx_interrupt_init();
+
+	while(1) {}
+}
+
+/**
+ * @brief		Transmits a character array to a serial terminal via
+ * 				UART2 TX paired with DMA1 Stream 6
+ */
+void uart2_dma1_test(void) {
+	/*Create test message to transmit to serial terminal*/
+	char message[31] = "Hello from STM32 DMA transfer\n\r";
+
+	/*Initialize necessary peripherals for test*/
+	uart2_tx_init();
+	uart2_dma1_init((uint32_t) message, (uint32_t) &USART2->DR, 31);
+
+	/* Enable General Purpose Output Mode for PA5*/
+	GPIOA->MODER |=  (1U<<10);
+	GPIOA->MODER &= ~(1U<<11);
 
 	while(1) {}
 }
@@ -247,6 +277,61 @@ void uart2_rx_interrupt_init(void) {
 }
 
 /**
+ * @brief		Initializes DMA1 Stream 6 to Memory -> Peripheral Mode
+ * 				Specifically, UART TX with interrupts enabled
+ */
+void uart2_dma1_init(uint32_t src, uint32_t dst, uint32_t len) {
+	/*Enable CLK access to the DMA*/
+	RCC->AHB1ENR |= DMA1EN;
+
+	/*Disable DMA1 Stream 6*/
+	DMA1_Stream6->CR &= ~DMA_CR_EN;
+
+	/*Wait until DMA1 Stream 6 is disabled*/
+	while(DMA1_Stream6->CR & DMA_CR_EN) {}
+
+	/*Clear all interrupt flags of stream 6*/
+	DMA1->HIFCR |= (1U<<16);
+	DMA1->HIFCR |= (1U<<18);
+	DMA1->HIFCR |= (1U<<19);
+	DMA1->HIFCR |= (1U<<20);
+	DMA1->HIFCR |= (1U<<21);
+
+	/*Set the destination buffer*/
+	DMA1_Stream6->PAR = dst;
+
+	/*Set the source buffer*/
+	DMA1_Stream6->M0AR = src;
+
+	/*Set the length*/
+	DMA1_Stream6->NDTR = len;
+
+	/*Select Stream 6 Channel 4*/
+	DMA1_Stream6->CR = CHSEL4;
+
+	/*Enable memory increment*/
+	DMA1_Stream6->CR |= DMA_MEM_INC;
+
+	/*Configure transfer direction - Memory -> Peripheral in this case*/
+	DMA1_Stream6->CR |= DMA_DIR_MEM_TO_PERIPH;
+
+	/*Enable DMA transfer complete interrupt*/
+	DMA1_Stream6->CR |= DMA_CR_TCIE;
+
+	/*Enable direct mode and disable FIFO*/
+	DMA1_Stream6->FCR = 0;
+
+	/*Enable DMA1 Stream 6*/
+	DMA1_Stream6->CR |= DMA_CR_EN;
+
+	/*Enable USART2 transmitter DMA*/
+	USART2->CR3 |= UART_CR3_DMAT;
+
+	/*Enable DMA1 interrupt*/
+	NVIC_EnableIRQ(DMA1_Stream6_IRQn);
+}
+
+/**
  * @brief       Blocks until a character is received, then reads it from the DR register
  * @return      Received character byte
  */
@@ -268,6 +353,26 @@ void uart2_write(int ch) {
 
 	/*Write to transmit data register*/
 	USART2->DR = (ch & 0xFF);
+}
+
+/**
+ * @brief       Callback function executed when DMA data is transferred
+ */
+static void dma_callback(void) {
+	GPIOA->ODR |= LED_PIN;
+}
+
+/**
+ * @brief       ISR for DMA1_Stream6 global interrupts
+ */
+void DMA1_Stream6_IRQHandler(void) {
+	/*Check for transfer complete interrupt*/
+	if(DMA1->HISR & HISR_TCIF6) {
+		/*Clear flag*/
+		DMA1->HIFCR |= HIFCR_CTCIF6;
+
+		dma_callback();
+	}
 }
 
 /**
